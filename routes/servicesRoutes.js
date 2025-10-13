@@ -1,9 +1,21 @@
 import express from "express";
-import { services } from "../data/beatyServices.js";
+import {
+  createService,
+  getServices,
+  getServiceById,
+  updateService,
+  deleteService,
+} from "../controllers/servicesController.js";
 
 const router = express.Router();
-router.get("/", (req, res) => {
-  res.json(services);
-});
+router.route("/")
+  .get(getServices)
+  .post(createService);
+
+router
+  .route("/:id")
+  .get(getServiceById)
+  .put(updateService)
+  .delete(deleteService);
 
 export default router;
