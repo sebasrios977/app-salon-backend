@@ -4,6 +4,9 @@ import {
   verifyAccount,
   login,
   user,
+  forgotPassword,
+  verifyPasswordResetToken,
+  updatePassword,
 } from "../controllers/authController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 
@@ -13,7 +16,12 @@ const router = express.Router();
 router
   .post("/register", register)
   .get("/verify/:token", verifyAccount)
-  .post("/login", login);
+  .post("/login", login)
+  .post("/forgot-password", forgotPassword);
+
+router.route("/forgot-password/:token")
+  .get(verifyPasswordResetToken)
+  .post(updatePassword);
 
 // Requiere JWT
 router.get("/user", authMiddleware, user);

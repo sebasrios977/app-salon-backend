@@ -22,3 +22,26 @@ export async function sendEmailVerification({ name, email, token }) {
   });
   console.log("Mensaje enviado: %s", info.messageId);
 }
+
+export async function sendEmailForgotPassword({ name, email, token }) {
+  const transport = createTransport(
+    process.env.MAILTRAP_HOST,
+    process.env.MAILTRAP_PORT,
+    process.env.MAILTRAP_USER,
+    process.env.MAILTRAP_PASS
+  );
+
+  const info = await transport.sendMail({
+    from: "AppSalon <cuentas@appsalon.com>",
+    to: email,
+    subject: "AppSalon - Recuperar contraseña",
+    text: "AppSalon - Recuperar contraseña",
+    html: `
+        <p>Hola: ${name}, has solicitado recuperar tu contraseña</p>
+        <p>Tu cuenta ya está casi lista, solo debes comprobarla en el siguiente enlace:
+        <a href="${process.env.FRONTEND_URL}/auth/olvide-password/${token}">Recuperar contraseña</a>
+        <p>Si tu no solicitaste recuperar tu contraseña, puedes ignorar este mensaje</p>
+    `,
+  });
+  console.log("Mensaje enviado: %s", info.messageId);
+}

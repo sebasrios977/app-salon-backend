@@ -1,7 +1,9 @@
 import User from "../models/User.model.js";
-import { sendEmailVerification } from "../emails/authEmailService.js";
-import { generateJWT } from "../utils/index.js";
-
+import {
+  sendEmailForgotPassword,
+  sendEmailVerification,
+} from "../emails/authEmailService.js";
+import { generateJWT, uniqueId } from "../utils/index.js";
 
 const register = async (req, res) => {
   if (Object.values(req.body).includes("")) {
@@ -48,7 +50,7 @@ const verifyAccount = async (req, res) => {
     return res.status(401).json({ msg: error.message });
   }
   try {
-    user.token = '';
+    user.token = "";
     user.verified = true;
     await user.save();
     res.json({ msg: "Cuenta verificada correctamente" });
@@ -58,31 +60,92 @@ const verifyAccount = async (req, res) => {
 };
 
 const login = async (req, res) => {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) {
-        const error = new Error("El usuario no existe");
-        return res.status(401).json({ msg: error.message });
-    }
-    if (!user.verified) {
-        const error = new Error("Tu cuenta no ha sido verificada");
-        return res.status(401).json({ msg: error.message });
-    }
-    if (await user.comparePassword(password)) {
-      const token = generateJWT(user._id);
-      res.json({
-        msg: 'Usuario autenticado correctamente',
-        token,
-      });
-    } else {
-        const error = new Error("La contraseña es incorrecta");
-        return res.status(403).json({ msg: error.message });
-    }
-}
+  const { email, password } = req.body;
+  const user = await User.findOne({ email });
+  if (!user) {
+    const error = new Error("El usuario no existe");
+    return res.status(401).json({ msg: error.message });
+  }
+  if (!user.verified) {
+    const error = new Error("Tu cuenta no ha sido verificada");
+    return res.status(401).json({ msg: error.message });
+  }
+  if (await user.comparePassword(password)) {
+    const token = generateJWT(user._id);
+    res.json({
+      msg: "Usuario autenticado correctamente",
+      token,
+    });
+  } else {
+    const error = new Error("La contraseña es incorrecta");
+    return res.status(403).json({ msg: error.message });
+  }
+};
+
+const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    const error = new Error("El usuario no existe");
+    return res.status(404).json({ msg: error.message });
+  }
+  try {
+    user.token = uniqueId();
+    const result = await user.save();
+
+    await sendEmailForgotPassword({
+      email: result.email,
+      name: result.name,
+      token: result.token,
+    });
+    res.json({ msg: "Correo enviado correctamente" });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ msg: "Error al enviar el correo" });
+  }
+};
+
+const verifyPasswordResetToken = async (req, res) => {
+  const { token } = req.params;
+  const isValidToken = await User.findOne({ token });
+
+  if (!isValidToken) {
+    const error = new Error("Token no valido");
+    return res.status(400).json({ msg: error.message });
+  }
+  res.json({ msg: "Token valido" });
+};
+
+const updatePassword = async (req, res) => {
+  const { token } = req.params;
+  const user = await User.findOne({ token });
+  if (!user) {
+    const error = new Error("Token no valido");
+    return res.status(400).json({ msg: error.message });
+  }
+  const { password } = req.body;
+  try {
+    user.token = "";
+    user.password = password;
+    await user.save();
+    res.json({ msg: "Contraseña actualizada correctamente" });
+  } catch (error) {
+    console.log(error);
+  }
+};
 
 const user = async (req, res) => {
   const { user } = req;
   res.json(user);
 };
 
-export { register, verifyAccount, login, user };
+export {
+  register,
+  verifyAccount,
+  login,
+  user,
+  forgotPassword,
+  verifyPasswordResetToken,
+  updatePassword,
+};
