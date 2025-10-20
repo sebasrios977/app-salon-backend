@@ -1,13 +1,23 @@
 import { endOfDay, formatISO, isValid, parse, startOfDay } from "date-fns";
 import Appointment from "../models/Appointment.model.js";
-import { validateObjectId } from "../utils/index.js";
+import { formatDateSpanish, validateObjectId } from "../utils/index.js";
+import {
+  sendEmailDeleteAppointment,
+  sendEmailNewAppointment,
+  sendEmailUpdateAppointment,
+} from "../emails/appointmentEmailService.js";
 
 const createAppointment = async (req, res) => {
   const appointment = req.body;
   appointment.user = req.user._id.toString();
   try {
     const newAppointment = new Appointment(appointment);
-    await newAppointment.save();
+    const result = await newAppointment.save();
+
+    await sendEmailNewAppointment({
+      date: formatDateSpanish(result.date),
+      time: result.time,
+    });
     res.json({ msg: "Cita creada correctamente" });
   } catch (error) {
     res.status(500).json({ msg: "Error al crear la cita" });
@@ -61,17 +71,17 @@ const getAppointmentById = async (req, res) => {
 
 const updateAppointment = async (req, res) => {
   const { id } = req.params;
-  
+
   // Validar por object id
   if (validateObjectId(id, res)) return;
-  
+
   try {
     const appointment = await Appointment.findById(id);
     if (!appointment) {
       const error = new Error("Cita no encontrada");
       return res.status(404).json({ msg: error.message });
     }
-    
+
     // Validar que el usuario sea el dueño de la cita
     if (
       req.user._id.toString() !== appointment.user.toString() &&
@@ -80,13 +90,18 @@ const updateAppointment = async (req, res) => {
       const error = new Error("Acceso no autorizado");
       return res.status(403).json({ msg: error.message });
     }
-    
+
     // Actualizar los campos de la cita
     Object.keys(req.body).forEach((key) => {
       appointment[key] = req.body[key];
     });
-    
-    await appointment.save();
+
+    const result = await appointment.save();
+    await sendEmailUpdateAppointment({
+      date: formatDateSpanish(result.date),
+      time: result.time,
+    });
+
     res.json({
       msg: "Cita actualizada correctamente",
     });
@@ -96,4 +111,44 @@ const updateAppointment = async (req, res) => {
   }
 };
 
-export { createAppointment, getAppointmentsByDate, getAppointmentById, updateAppointment };
+const deleteAppointment = async (req, res) => {
+  const { id } = req.params;
+
+  // Validar por object id
+  if (validateObjectId(id, res)) return;
+  try {
+    const appointment = await Appointment.findById(id);
+    if (!appointment) {
+      const error = new Error("Cita no encontrada");
+      return res.status(404).json({ msg: error.message });
+    }
+
+    // Validar que el usuario sea el dueño de la cita
+    if (
+      req.user._id.toString() !== appointment.user.toString() &&
+      !req.user.admin
+    ) {
+      const error = new Error("Acceso no autorizado");
+      return res.status(403).json({ msg: error.message });
+    }
+
+    await appointment.deleteOne();
+
+    await sendEmailDeleteAppointment({
+      date: formatDateSpanish(appointment.date),
+      time: appointment.time,
+    });
+    res.json({ msg: "Cita eliminada correctamente" });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ msg: "Error al eliminar la cita" });
+  }
+};
+
+export {
+  createAppointment,
+  getAppointmentsByDate,
+  getAppointmentById,
+  updateAppointment,
+  deleteAppointment,
+};
